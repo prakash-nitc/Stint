@@ -1,0 +1,37 @@
+/* Only the latin woff2 subsets are bundled. The fontsource entrypoints pull in
+   cyrillic, greek and vietnamese plus woff fallbacks — 568 KB for an offline
+   English app on one phone, where Chrome has supported woff2 for years. */
+
+@font-face {
+  font-family: 'IBM Plex Sans Condensed';
+  font-style: normal;
+  font-weight: 500;
+  /* block, not swap: these load from the APK in milliseconds, and a flash of
+     system-ui at the clock's cap height is far uglier than a frame of nothing. */
+  font-display: block;
+  src: url('./fonts/ibm-plex-sans-condensed-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-sans-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-sans-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}

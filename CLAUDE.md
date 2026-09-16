@@ -120,6 +120,10 @@ layout and spacing only. Never write a hex value in a component.
 | `--patina` | `#7FA88C` | ahead of pace |
 | `--oxide` | `#B5734A` | behind pace |
 
+Tags get no colors of their own. `--patina` and `--oxide` mean ahead and behind
+everywhere else in the app, and a tag palette would either collide with that or
+invent tokens that are not in this table.
+
 Type: **IBM Plex Sans Condensed 500** for flip digits only. **IBM Plex Sans**
 for everything else. **IBM Plex Mono** only in the History timestamp columns.
 
@@ -140,6 +144,10 @@ an instrument someone designed on purpose.
 - Fade-and-slide-up entrance animations on cards and sections
 - Hover transitions on a touch-only app
 - Percentages where a duration is clearer — `2h 40m ahead`, not `+11%`
+- Pie or donut charts — square-cornered bars with the duration written next to
+  them, always
+- Aggregates stated as fact on thin data — below five sessions, say there is not
+  enough yet
 - Pure `#FFF` or pure `#000` anywhere
 - Celebratory copy: no "Great job!", no "You're on fire", no streak confetti
 
@@ -178,6 +186,10 @@ Required before the corresponding UI is built:
   correctly chained, with the last one still running
 - `db/rollups.ts` — a running session contributes its live elapsed time to today,
   this week, and this month, clamped to each window
+- `db/rollups.ts` — `byHourOfDay` clips a session running 09:47 to 11:12 into
+  13m, 60m, 12m across three hour buckets
+- `lib/pace.ts` — `weekPace` returns two comparisons, and the second one is the
+  week before last, not last week counted twice
 
 ---
 

@@ -15,14 +15,18 @@ The name is used in exactly three places (`package.json`, `capacitor.config.ts`,
 split-flap clock counting today's study time in hours and minutes. Everything else
 in the app is a place you visit occasionally.
 
-**One interaction matters.** Start. Stop. Nothing in between — no pause, no
-subject picker, no "what are you working on?" dialog. A break *is* the end of a
+**One interaction matters.** Start. Stop. No pause — a break *is* the end of a
 session. Friction at the start button is the failure mode that kills apps like
 this, so there is none.
 
+**Tags do not gate the start.** A session is tagged, but the tag is never
+something you wait on. Tapping `Start` begins the session *immediately*; the
+tag row appears over the already-running clock, and picking is optional. Walk
+away without choosing and the session is `Unset`, which is a real tag you can
+fix later in History. The clock must never sit at 0:00 waiting for a decision.
+
 **Non-goals for v1.** No accounts, no cloud sync, no notifications, no pomodoro,
-no home-screen widget, no subject tags, no goals beyond a single daily target.
-The schema leaves room for tags later; the UI does not.
+no home-screen widget, no goals beyond a single daily target.
 
 ---
 
@@ -58,13 +62,13 @@ interface Session {
   endedAt: number | null;// null means running; at most one such row exists
   dayKey: string;        // "2026-09-16" — local calendar date of startedAt
   splitFrom?: string;    // id of the session this one continues, if split at midnight
-  tag?: string;          // reserved, unused in v1
+  tag?: string;          // "work" | "study" | user-defined; absent means Unset
 }
 ```
 
 ```ts
 db.version(1).stores({
-  sessions: 'id, dayKey, startedAt, endedAt'
+  sessions: 'id, dayKey, startedAt, endedAt, tag'
 });
 ```
 
@@ -231,6 +235,31 @@ A single line above the bar chart, in plain language:
 Not a percentage, not an arrow glyph, not a badge. When the delta is under
 5 minutes it says `level with last week` and stays neutral in color.
 
+### The second comparison
+
+One period back answers "am I keeping up." Two periods back answers "is this a
+slump or is this just me," which is the more useful question after a bad week.
+
+So `weekPace` and `monthPace` both return an array of comparisons, not one:
+
+```ts
+interface Comparison {
+  label:    string;   // "last week", "the week of 8 Sep"
+  previous: number;
+  delta:    number;
+}
+
+function weekPace(now: number): { current: number; against: Comparison[] }
+```
+
+Two entries for now. The function shape means a third costs nothing later.
+
+**The headline stays single.** The pace line above the chart reads one
+comparison — the nearest period — because that is the glance. The second
+comparison lives below the chart with the totals, where you are already
+reading numbers rather than taking in a state. Two sentences stacked above a
+chart is a dashboard, and this is not one.
+
 ---
 
 ## 6. The two things that will actually go wrong
@@ -360,6 +389,22 @@ accent color appears on this screen.
 
 Haptic `impact: medium` on start, `impact: light` on stop.
 
+### The tag row
+
+On `Start`, the session begins and a single row of tags fades in beneath the
+control — `Work`, `Study`, and whatever else has been used before. No modal, no
+scrim, nothing blocking. The clock is already counting behind it.
+
+Tapping one assigns it and the row dismisses. Touching anything else, or ten
+seconds of nothing, dismisses it too and the session stays `Unset`. Tapping the
+current tag while running reopens the row; changing it re-tags the running
+session and never restarts it.
+
+This is the whole compromise. The picker is at the start, where it is useful and
+where you remember what you sat down to do — but it is downstream of the timer,
+so it can never cost you a minute or a session. If it ever starts to feel like a
+question you have to answer, it has failed and it should go.
+
 ### Stats screen (portrait)
 
 Segmented control: `Week · Month · Year`. Below it, the pace line from §5, then a
@@ -371,6 +416,55 @@ hours in `--rule` at 40% opacity, labelled at the left edge in `--ink-dim`.
 
 Weekly view: 7 bars, Mon–Sun. Monthly: one bar per day, no labels except the 1st
 and the 15th. Yearly: 12 bars.
+
+### Time of day
+
+Below the period chart, 24 bars — one per hour, midnight to midnight — showing
+where the studying actually falls. This is the chart that changes behaviour:
+a week total tells you how much, this tells you when, and "nothing after 6 PM"
+is something you can act on tonight.
+
+Same visual language as the period bars. Labels at `00`, `06`, `12`, `18` only.
+It aggregates across whatever period the segmented control has selected.
+
+Sessions cannot cross midnight (§3) but they cross hours constantly, so this is
+the one place in the app doing partial-overlap arithmetic. `byHourOfDay` clips
+each session into the hour buckets it spans. Keep that clipping in one function
+and test it against a session running 09:47 → 11:12, which must produce 13m,
+60m, 12m.
+
+### Tags
+
+A tag breakdown under the totals: one row per tag, a horizontal bar sized by
+share, the tag name, and the duration.
+
+```
+Work    ████████████████████████░░░░░░░  8h 45m
+Study   ████░░░░░░░░░░░░░░░░░░░░░░░░░░░  1h 34m
+Unset   ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    58m
+```
+
+Durations, not percentages — `8h 45m` is the number you can do something with,
+`78%` is a number about the chart. Bars are `--flap-lower` on `--rule`. Not a
+donut: the app's visual language is square-cornered measurement, and a pie
+forces a legend to say what the shape already failed to.
+
+Tag colors: none. Tags are rows of text with bars, distinguished by their names.
+Introducing a per-tag palette means either inventing colors outside the token
+list or reusing `--patina` and `--oxide`, which mean ahead and behind everywhere
+else in the app.
+
+### Weak statistics
+
+Aggregates like "most focused hour" or "most focused weekday" are patterns, and
+a pattern needs data. Below **five sessions** in the selected period, these say
+so plainly rather than asserting a trend:
+
+> Not enough sessions yet to see a pattern.
+
+Announcing "most focused at 10:00" off a single 20-minute session is the kind of
+confident nonsense that makes an app feel automated. The threshold is cheap; the
+credibility is not.
 
 ### Motion elsewhere
 
@@ -388,10 +482,21 @@ held on.
 
 ### Auto-dim
 
-After **90 seconds** with no touch, fade a `--base` overlay to 45% opacity over
-1.2 s. Any touch clears it instantly. He is studying, not watching the clock, and
-a phone at full brightness in peripheral vision for three hours is a distraction
-and a battery cost.
+Two stages, both cleared instantly by any touch.
+
+| After | Overlay | Over |
+|---|---|---|
+| 90 seconds | `--base` at 45% | 1.2 s |
+| 10 minutes | `--base` at 85% | 4 s |
+
+The first stage is about distraction: he is studying, not watching the clock,
+and a phone at full brightness in peripheral vision for three hours costs
+attention and battery.
+
+The second stage is about the panel. Burn-in rate scales steeply with
+luminance, so ten minutes untouched — which is most of a study session —
+dropping the clock to a faint reading of itself does more for the screen than
+any animation could. It stays legible from across a desk. It is not off.
 
 ### Burn-in
 
@@ -399,11 +504,26 @@ A static flip clock on an OLED for six hours a day for a year will leave a ghost
 Two mitigations, both invisible in use:
 
 1. **Pixel shift.** Every 90 s, translate the entire clock container to a new
-   offset within a ±4 dp box, over a 2 s ease. The eye does not register it.
-2. The dark palette and the auto-dim above already keep average luminance low.
+   offset within a **±12 dp** box, over a 2 s ease. The eye does not register it.
+
+   ±4 dp was the first number here and it was too timid. The digits have a cap
+   height around 248 dp, so a 4 dp excursion only ever softens the *edges* of a
+   stroke — the interior of a thick stroke stays lit under the same pixels all
+   session. The landscape layout has room to spare on a left-aligned clock, and
+   at 2 s of easing ±12 dp is equally invisible.
+
+2. The dark palette and the two-stage auto-dim above already keep average
+   luminance low, which matters more than either of the above.
 
 Do not skip this because it seems paranoid. It is the specific failure mode of
 this specific app on this specific panel.
+
+**No particle animation.** The obvious third mitigation — drifting particles to
+exercise the dark pixels — is deliberately rejected. It needs a
+`requestAnimationFrame` loop repainting for hours on a phone already holding its
+screen awake, and it puts a second animated element on a screen whose entire
+motion budget belongs to the flip. Widening the shift and dimming harder buys
+more protection for no frames and no battery.
 
 ---
 
@@ -422,24 +542,29 @@ src/
       flip.css             keyframes and the overlay opacity curves
     stats/
       PeriodBars.tsx
+      HourBars.tsx         24 bars, time of day
+      TagBreakdown.tsx     rows with bars and durations, never a donut
       PaceLine.tsx
       TotalsRow.tsx
     ui/
       Button.tsx
       Segmented.tsx
       Sheet.tsx            used only by the long-session review
+      TagRow.tsx           the non-blocking picker over a running clock
   store/
     sessionStore.ts        zustand: activeSession, start(), stop(), tick
   db/
     db.ts                  dexie schema
-    sessions.ts            create / close / update / delete
-    rollups.ts             totalBetween, byDay, byWeek, byMonth
+    sessions.ts            create / close / update / delete / retag
+    rollups.ts             totalBetween, byDay, byWeek, byMonth, byHourOfDay, byTag
     repair.ts              midnight split + resume repair pass
   lib/
     time.ts                dayKey, startOfISOWeek, startOfMonth, formatHM
     pace.ts                weekPace, monthPace
+    tags.ts                the tag list, and Unset
   theme/
     tokens.css
+    fonts.css              latin woff2 only; see the note in the file
 ```
 
 Orientation: `TimerScreen` calls `ScreenOrientation.lock({ orientation: 'landscape' })`
@@ -461,13 +586,22 @@ Dexie schema, start/stop, `totalBetween`, the flip clock, keep-awake, landscape
 lock. At the end of this phase the app does its actual job. Use it for a few days
 before building anything else.
 
+Tags are *stored* from phase 2 — the column is written, defaulting to `Unset` —
+but the picker is phase 4. Recording them from the first session means the tag
+breakdown has history to show on the day it ships, instead of starting empty.
+
 **Phase 3 — it is honest** *(~4h)*
 Midnight split, resume repair pass, the long-session review sheet, History screen
 with edit and delete. Unit tests for the split and the repair.
 
-**Phase 4 — it answers the question** *(~5h)*
-Stats screen, rollups, `weekPace` / `monthPace`, bar charts. Unit tests for the
-month clamp.
+**Phase 4 — it answers the question** *(~7h)*
+Stats screen, rollups, `weekPace` / `monthPace` with two comparisons, period bar
+charts, the time-of-day chart, the tag row on the timer screen and the tag
+breakdown. Unit tests for the month clamp and for `byHourOfDay` clipping.
+
+This phase roughly doubled when the tag and time-of-day work landed in it. If it
+needs splitting, ship the period charts and pace first — the time-of-day chart
+and tags are independent of them and of each other.
 
 **Phase 5 — it is finished** *(~4h)*
 Auto-dim, pixel shift, haptics, app icon, the flip animation pass where you sit
@@ -485,4 +619,8 @@ looking and adjusting, not a task that can be specified away.
 - On a Wednesday, the week comparison uses Monday-through-Wednesday of last week.
 - On the 30th of a month following February, the month comparison does not
   reach into the current month.
+- A session from 09:47 to 11:12 lands in the time-of-day chart as 13m, 60m, 12m
+  and not as 85m in one bucket.
+- Tapping `Start` and then walking away records a session. The tag row does not
+  hold the clock at 0:00, and never has.
 - The flip looks right at 90 Hz with the phone at arm's length on a desk.
