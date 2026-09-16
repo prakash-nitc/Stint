@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="base">#0E1211</color>
+    <color name="chassis">#19201E</color>
+    <color name="ink">#EDE6D6</color>
+    <color name="colorPrimary">#19201E</color>
+    <color name="colorPrimaryDark">#0E1211</color>
+    <color name="colorAccent">#C9A227</color>
+</resources>

@@ -1,0 +1,24 @@
+/* A split-flap departure board in a dim room. Every value below comes from that
+   object: aged aluminium housing, printed cards, brass hardware, one sodium lamp
+   off to the side. See SPEC.md section 7. */
+:root {
+  --base:       #0E1211;
+  --chassis:    #19201E;
+  --flap-lower: #232C29;
+  --flap-upper: #2C3733;
+  --seam:       #070A09;
+  --rule:       #29332F;
+
+  --ink:        #EDE6D6;
+  --ink-dim:    #7A8580;
+
+  --brass:      #C9A227;
+  --brass-halo: rgba(201, 162, 39, 0.10);
+
+  --patina:     #7FA88C;
+  --oxide:      #B5734A;
+
+  --font-digit: 'IBM Plex Sans Condensed', system-ui, sans-serif;
+  --font-ui:    'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono:  'IBM Plex Mono', ui-monospace, monospace;
+}
